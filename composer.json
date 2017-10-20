@@ -1,5 +1,7 @@
 {
     "require": {
-        "fabpot/goutte": "^2.0"
+        "fabpot/goutte": "^2.0",
+        "vlucas/phpdotenv": "^2.4",
+        "propel/propel": "~2.0@dev"
     }
 }
