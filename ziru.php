@@ -13,28 +13,18 @@ require __DIR__ . '/vendor/autoload.php';
 require __DIR__ . '/conf.php';
 
 (new \Dotenv\Dotenv(__DIR__))->load();
-$conn = [
-    'driver' => 'pdo_mysql',
-    'host' => getenv('DB_HOST'),
-    'port' => getenv('DB_PORT'),
-    'dbname' => getenv('DB_DATABASE'),
-    'user' => getenv('DB_USERNAME'),
-    'password' => getenv('DB_PASSWORD'),
-];
-
-
-
 
 $urls = [
     'BeiCai' => 'http://sh.ziroom.com/z/nl/z2-u4-d310115-b611900123.html',
 ];
 $goutte = new Goutte\Client();
+$dbh = new PDO('mysql:host='. getenv('DB_HOST') .
+    ';dbname=' . getenv('DB_DATABASE') . ';charset=utf8',
+    getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
 
 foreach ($urls as $url) {
-    $url = 'http://sh.ziroom.com/z/nl/z2-u4-d310115-b611900123.html?p=3';
     do {
-        $insert = [];
-        $crawler = $goutte->request('GET', $url)->filter('div.t_newlistbox');
+        $crawler = $goutte->request('GET', $url);
         $texts = $crawler->filter('#houseList > li')->each(function ($node) {
             return array_map(function ($v) {
                 return trim($v);
@@ -45,15 +35,32 @@ foreach ($urls as $url) {
                     'area' => $node->filter('.txt > .detail > p')->first()->filter('span')->first()->text(),
                     'floor' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(1)->text(),
                     'type' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(2)->text(),
-                    'is_part' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(3)->text() == '合' ? 1 : 0,
                     'distance' => $node->filter('.txt > .detail > p')->eq(1)->text(),
                     'price' => preg_match('/(\d+)/', $node->filter('.priceDetail > .price')->text(), $m) ? $m[1] : false,
-                    'province' => $GLOBALS['crawler']->filter('#current_city')->text(),
+                    'is_part' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(3)->text() == '合' ? 1 : 0,
                     'raw_text' => $node->text(),
+                    'province' => $GLOBALS['crawler']->filter('#current_city')->text(),
             ]);
         });
-        var_dump($texts);die;
+        store($dbh, $texts);
+
         $next = $crawler->selectLink('下一页')->count();
     } while ($url = $next ? $crawler->selectLink('下一页')->link()->getUri() : false);
 
+}
+
+
+/**
+ * @param $dbh
+ * @param $texts
+ */
+function store(PDO $dbh, $texts)
+{
+    $keys = array_keys(current($texts));
+    $sql = "replace into ziru_house (" . implode(',', $keys) . ") values (" . implode(',', array_fill(0, count($keys), '?')) . ");";
+    $sth = $dbh->prepare($sql);
+    foreach ($texts as $text) {
+//        var_dump(array_slice($text, 0));
+        $sth->execute(array_values($text));
+    }
 }
