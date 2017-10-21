@@ -44,12 +44,15 @@ foreach ($urls as $url) {
                     'link' => $node->filter('.txt > h3 > a')->attr('href'),
                     'area' => $node->filter('.txt > .detail > p')->first()->filter('span')->first()->text(),
                     'floor' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(1)->text(),
-                    'roomType' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(2)->text(),
+                    'type' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(2)->text(),
+                    'is_part' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(3)->text() == '合' ? 1 : 0,
                     'distance' => $node->filter('.txt > .detail > p')->eq(1)->text(),
                     'price' => preg_match('/(\d+)/', $node->filter('.priceDetail > .price')->text(), $m) ? $m[1] : false,
+                    'province' => $GLOBALS['crawler']->filter('#current_city')->text(),
+                    'raw_text' => $node->text(),
             ]);
         });
-
+        var_dump($texts);die;
         $next = $crawler->selectLink('下一页')->count();
     } while ($url = $next ? $crawler->selectLink('下一页')->link()->getUri() : false);
 
