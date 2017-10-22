@@ -19,7 +19,7 @@ $urls = [
 ];
 $goutte = new Goutte\Client();
 $dbh = new PDO('mysql:host='. getenv('DB_HOST') .
-    ';dbname=' . getenv('DB_DATABASE') . ';charset=utf8',
+    ';dbname=' . getenv('DB_DATABASE') . ';charset=utf8mb4',
     getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
 
 foreach ($urls as $url) {
@@ -57,10 +57,16 @@ foreach ($urls as $url) {
 function store(PDO $dbh, $texts)
 {
     $keys = array_keys(current($texts));
-    $sql = "replace into ziru_house (" . implode(',', $keys) . ") values (" . implode(',', array_fill(0, count($keys), '?')) . ");";
+    $sql = "insert into ziru_house (" . implode(',', $keys) . ") values (" . implode(',', array_fill(0, count($keys), '?')) . ") on duplicate key update ";
+    $onUpdate = array_map(function ($v) {
+        return "$v=values($v)";
+    }, $keys);
+    $sql .= implode(',', $onUpdate);
+//    var_dump($sql);die;
     $sth = $dbh->prepare($sql);
     foreach ($texts as $text) {
-//        var_dump(array_slice($text, 0));
+//        var_dump(array_values($text));
         $sth->execute(array_values($text));
+//        var_dump($sth->errorInfo());die;
     }
 }
