@@ -11,7 +11,7 @@ require __DIR__ . '/vendor/autoload.php';
 use PHPMailer\PHPMailer\PHPMailer;
 
 (new \Dotenv\Dotenv(__DIR__))->load();
-
+date_default_timezone_set('Asia/Shanghai');
 $mailer = new PHPMailer();
 $goutte = new Goutte\Client();
 
@@ -61,28 +61,34 @@ foreach ($data as $k => $d) {
 }
 
 # email send
-array_walk($data, function ($v, $k) use ($mailer, $unique, $roomCount) {
-    if (count($v) == $roomCount) {
-        try {
-            $mailer->CharSet = 'UTF-8';
-            $mailer->SMTPDebug = 2;                                 // Enable verbose debug output
-            $mailer->isSMTP();                                      // Set mailer to use SMTP
-            $mailer->Host = 'smtp.163.com';  // Specify main and backup SMTP servers
-            $mailer->SMTPAuth = true;                               // Enable SMTP authentication
-            $mailer->Username = getenv('MAIL_USERNAME');                 // SMTP username
-            $mailer->Password = getenv('MAIL_PASSWORD');                           // SMTP password
-            $mailer->SMTPSecure = 'ssl';                            // Enable TLS encryption, `ssl` also accepted
-            $mailer->Port = 465;
-            $mailer->setFrom(getenv('MAIL_USERNAME'));
-            $mailer->addAddress(getenv('MAIL_USERNAME'));     // Add a recipient
+$mailer->CharSet = 'UTF-8';
+$mailer->SMTPDebug = 2;                                 // Enable verbose debug output
+$mailer->isSMTP();                                      // Set mailer to use SMTP
+$mailer->Host = 'smtp.163.com';  // Specify main and backup SMTP servers
+$mailer->SMTPAuth = true;                               // Enable SMTP authentication
+$mailer->Username = getenv('MAIL_USERNAME');                 // SMTP username
+$mailer->Password = getenv('MAIL_PASSWORD');                           // SMTP password
+$mailer->SMTPSecure = 'ssl';                            // Enable TLS encryption, `ssl` also accepted
+$mailer->Port = 465;
+$mailer->setFrom(getenv('MAIL_USERNAME'));
+$mailer->addAddress(getenv('MAIL_USERNAME'));     // Add a recipient
 
-            $mailer->isHTML(true);
-            $mailer->Subject = $unique[$k]['title'];
-            $mailer->Body    = "<a href='{$unique[$k]['link']}'>{$unique[$k]['title']}</a>";
-            $mailer->AltBody = $unique[$k]['link'];
-            $mailer->send();
-        } catch (Exception $e) {
-            echo 'Mailer Error: ' . $mailer->ErrorInfo;
-        }
-    }
+$mailer->isHTML(true);
+$mailer->Subject = 'ziru room info_' . date('Y-m-d H:i:s');
+$mailer->Body    = '';
+$mailer->AltBody = '';
+
+$info = array_filter($data, function ($v) use ($roomCount) {
+    return count($v) == $roomCount;
 });
+foreach ($info as $k => $v) {
+    $mailer->Body .= <<<EOL
+<a href='{$unique[$k]['link']}'>{$unique[$k]['title']}</a><br>
+EOL;
+}
+
+try {
+    $mailer->send();
+} catch (Exception $e) {
+    echo 'Mailer Error: ' . $mailer->ErrorInfo;
+}
