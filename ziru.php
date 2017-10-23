@@ -21,7 +21,8 @@ $goutte = new Goutte\Client();
 $dbh = new PDO('mysql:host='. getenv('DB_HOST') .
     ';dbname=' . getenv('DB_DATABASE') . ';charset=utf8mb4',
     getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
-
+$sql = "update ziru_house set status = 0;";
+$dbh->exec($sql);
 foreach ($urls as $url) {
     do {
         $crawler = $goutte->request('GET', $url);
@@ -31,7 +32,7 @@ foreach ($urls as $url) {
             }, [
                     'title' => $node->filter('.txt > h3')->text(),
                     'zone' => $node->filter('.txt > h4')->text(),
-                    'link' => $node->filter('.txt > h3 > a')->attr('href'),
+                    'link' => isset($_SERVER['HTTPS']) ? 'https' : 'http' . ':' . $node->filter('.txt > h3 > a')->attr('href'),
                     'area' => $node->filter('.txt > .detail > p')->first()->filter('span')->first()->text(),
                     'floor' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(1)->text(),
                     'type' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(2)->text(),
@@ -40,6 +41,7 @@ foreach ($urls as $url) {
                     'is_part' => $node->filter('.txt > .detail > p')->first()->filter('span')->eq(3)->text() == '合' ? 1 : 0,
                     'raw_text' => $node->text(),
                     'province' => $GLOBALS['crawler']->filter('#current_city')->text(),
+                    'status' => 1,
             ]);
         });
         store($dbh, $texts);

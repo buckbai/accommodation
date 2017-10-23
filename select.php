@@ -13,14 +13,15 @@ use PHPMailer\PHPMailer\PHPMailer;
 (new \Dotenv\Dotenv(__DIR__))->load();
 
 $mailer = new PHPMailer();
+$goutte = new Goutte\Client();
 
-
+$roomCount = 4;
 $dbh = new PDO('mysql:host='. getenv('DB_HOST') .
     ';dbname=' . getenv('DB_DATABASE') . ';charset=utf8mb4',
     getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
 
 $unique = $data = [];
-$sql = "select * from ziru_house where last_change_time > date_sub(now(), interval 1 hour);";
+$sql = "select * from ziru_house where status = 1;";
 $sth = $dbh->query($sql);
 while ($row = $sth->fetch(PDO::FETCH_ASSOC)) {
     $flag = false;
@@ -30,13 +31,12 @@ while ($row = $sth->fetch(PDO::FETCH_ASSOC)) {
             $row['type'] == $u['type'] &&
             $row['distance'] === $u['distance']
         ) {
-//            if (strstr($row['title'], '-', true) ==
-//                strstr($u['title'], '-', true)
-//            ) {
             $flag = true;
-            $data[$i] = isset($data[$i]) ? $data[$i] + 1 : 2;
+            if (empty($data[$i])) {
+                $data[$i][] = $u;
+            }
+            $data[$i][] = $row;
             break;
-//            }
         }
     }
     if (!$flag) {
@@ -44,16 +44,34 @@ while ($row = $sth->fetch(PDO::FETCH_ASSOC)) {
     }
 }
 
-array_walk($data, function ($v, $k) use ($mailer, $unique) {
-    if ($v > 3) {
+# remove same attr add but not satisfy the requirements.
+foreach ($data as $k => $d) {
+    if (count($d) >= $roomCount) {
+        foreach ($d as $i => $r) {
+            if (count($data[$k]) < $roomCount) {
+                break;
+            }
+            $crawler = $goutte->request('GET', $unique[$k]['link']);
+            if ($crawler->filter('.greatRoommate li.current')->count() != $roomCount) {
+                unset($data[$k][$i]);
+                $unique[$k] = current($data[$k]);
+            }
+        }
+    }
+}
+
+# email send
+array_walk($data, function ($v, $k) use ($mailer, $unique, $roomCount) {
+    if (count($v) == $roomCount) {
         try {
+            $mailer->CharSet = 'UTF-8';
             $mailer->SMTPDebug = 2;                                 // Enable verbose debug output
             $mailer->isSMTP();                                      // Set mailer to use SMTP
             $mailer->Host = 'smtp.163.com';  // Specify main and backup SMTP servers
             $mailer->SMTPAuth = true;                               // Enable SMTP authentication
             $mailer->Username = getenv('MAIL_USERNAME');                 // SMTP username
             $mailer->Password = getenv('MAIL_PASSWORD');                           // SMTP password
-            $mailer->SMTPSecure = 'tls';                            // Enable TLS encryption, `ssl` also accepted
+            $mailer->SMTPSecure = 'ssl';                            // Enable TLS encryption, `ssl` also accepted
             $mailer->Port = 465;
             $mailer->setFrom(getenv('MAIL_USERNAME'));
             $mailer->addAddress(getenv('MAIL_USERNAME'));     // Add a recipient
