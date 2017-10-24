@@ -21,7 +21,7 @@ $dbh = new PDO('mysql:host='. getenv('DB_HOST') .
     getenv('DB_USERNAME'), getenv('DB_PASSWORD'));
 
 $unique = $data = [];
-$sql = "select * from ziru_house where status = 1;";
+$sql = "select * from ziru_house where status = 1 order by id;";
 $sth = $dbh->query($sql);
 while ($row = $sth->fetch(PDO::FETCH_ASSOC)) {
     $flag = false;
@@ -51,10 +51,14 @@ foreach ($data as $k => $d) {
             if (count($data[$k]) < $roomCount) {
                 break;
             }
+//            echo 'request ', $unique[$k]['id'], PHP_EOL;
             $crawler = $goutte->request('GET', $unique[$k]['link']);
             if ($crawler->filter('.greatRoommate li.current')->count() != $roomCount) {
                 unset($data[$k][$i]);
                 $unique[$k] = current($data[$k]);
+            } else {
+                storeInSatisfaction($dbh, $unique[$k]['id']);
+                break;
             }
         }
     }
@@ -82,13 +86,31 @@ $info = array_filter($data, function ($v) use ($roomCount) {
     return count($v) == $roomCount;
 });
 foreach ($info as $k => $v) {
+    if (alreadyExist($dbh, $unique[$k]['id'])) {
+        continue;
+    }
     $mailer->Body .= <<<EOL
 <a href='{$unique[$k]['link']}'>{$unique[$k]['title']}</a><br>
 EOL;
 }
 
-try {
-    $mailer->send();
-} catch (Exception $e) {
-    echo 'Mailer Error: ' . $mailer->ErrorInfo;
+if ($mailer->Body) {
+    try {
+        $mailer->send();
+    } catch (Exception $e) {
+        echo 'Mailer Error: ' . $mailer->ErrorInfo;
+    }
+}
+
+
+function storeInSatisfaction(PDO $dbh, $id)
+{
+    $sql = "insert into ziru_satisfaction (ziru_house_id) values ($id) on duplicate key update last_change_time = NOW();";
+    $dbh->exec($sql);
+}
+
+function alreadyExist(PDO $dbh, $id)
+{
+    $sql = "select count(*) from ziru_satisfaction where ziru_house_id = $id and add_time < DATE_SUB(last_change_time, INTERVAL 1 MINUTE) limit 1;";
+    return $dbh->query($sql)->fetchColumn();
 }
